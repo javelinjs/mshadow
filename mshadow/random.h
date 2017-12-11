@@ -124,7 +124,19 @@ class Random<cpu, DType> {
                                       std::uniform_int_distribution<DType>,
                                       std::uniform_real_distribution<FType>>::type GType;
     GType dist_uniform(a, b);
-    SampleDistribution(dst, [&](){ return dist_uniform(rnd_engine_);});
+    SampleDistribution(dst, [&](){ return static_cast<DType>(dist_uniform(rnd_engine_));});
+  }
+
+  template<typename PType>
+  inline DType SampleUniform(PType a = 0.0f, PType b = 1.0f) {
+    // Ensure that half_t is handled correctly.
+    typedef typename std::conditional<std::is_floating_point<DType>::value,
+                                      DType, double>::type FType;
+    typedef typename std::conditional<std::is_integral<DType>::value,
+                                      std::uniform_int_distribution<DType>,
+                                      std::uniform_real_distribution<FType>>::type GType;
+    GType dist_uniform(a, b);
+    return static_cast<DType>(dist_uniform(rnd_engine_));
   }
 
   /*!
@@ -143,7 +155,18 @@ class Random<cpu, DType> {
     typedef typename std::conditional<std::is_floating_point<DType>::value,
                                       DType, double>::type GType;
     std::normal_distribution<GType> dist_normal(mu, sigma);
-    SampleDistribution(dst, [&](){ return dist_normal(rnd_engine_);});
+    SampleDistribution(dst, [&](){ return static_cast<DType>(dist_normal(rnd_engine_));});
+  }
+
+  template<typename PType>
+  inline DType SampleGaussian(PType mu = 0.0f, PType sigma = 1.0f) {
+    if (sigma <= 0) {
+      return mu;
+    }
+    typedef typename std::conditional<std::is_floating_point<DType>::value,
+                                      DType, double>::type GType;
+    std::normal_distribution<GType> dist_normal(mu, sigma);
+    return static_cast<DType>(dist_normal(rnd_engine_));
   }
 
   /*!
@@ -159,7 +182,15 @@ class Random<cpu, DType> {
     typedef typename std::conditional<std::is_floating_point<DType>::value,
                                       DType, double>::type GType;
     std::gamma_distribution<GType> dist_gamma(alpha, beta);
-    SampleDistribution(dst, [&](){ return dist_gamma(rnd_engine_);});
+    SampleDistribution(dst, [&](){ return static_cast<DType>(dist_gamma(rnd_engine_));});
+  }
+
+  template<typename PType>
+  inline DType SampleGamma(PType alpha, PType beta) {
+    typedef typename std::conditional<std::is_floating_point<DType>::value,
+                                      DType, double>::type GType;
+    std::gamma_distribution<GType> dist_gamma(alpha, beta);
+    return static_cast<DType>(dist_gamma(rnd_engine_));
   }
 
   /*!
@@ -173,7 +204,15 @@ class Random<cpu, DType> {
     typedef typename std::conditional<std::is_floating_point<DType>::value,
                                       DType, double>::type GType;
     std::exponential_distribution<GType> dist_exp(lambda);
-    SampleDistribution(dst, [&](){ return dist_exp(rnd_engine_);});
+    SampleDistribution(dst, [&](){ return static_cast<DType>(dist_exp(rnd_engine_));});
+  }
+
+  template<typename PType>
+  inline DType SampleExponential(PType lambda) {
+    typedef typename std::conditional<std::is_floating_point<DType>::value,
+                                      DType, double>::type GType;
+    std::exponential_distribution<GType> dist_exp(lambda);
+    return static_cast<DType>(dist_exp(rnd_engine_));
   }
 
   /*!
@@ -189,6 +228,13 @@ class Random<cpu, DType> {
     SampleDistribution(dst, [&](){ return static_cast<DType>(dist_poisson(rnd_engine_));});
   }
 
+  template<typename PType>
+  inline DType SamplePoisson(PType lambda) {
+    typedef typename std::conditional<std::is_integral<DType>::value, DType, int>::type GType;
+    std::poisson_distribution<GType> dist_poisson(lambda);
+    return static_cast<DType>(dist_poisson(rnd_engine_));
+  }
+
   /*!
    * \brief generate data from a negative binomial distribution
    * \param dst destination
@@ -201,6 +247,13 @@ class Random<cpu, DType> {
     typedef typename std::conditional<std::is_integral<DType>::value, DType, int>::type GType;
     std::negative_binomial_distribution<GType> dist_negbinomial(k, p);
     SampleDistribution(dst, [&](){ return static_cast<DType>(dist_negbinomial(rnd_engine_));});
+  }
+
+  template<typename PType>
+  inline DType SampleNegativeBinomial(PType k, PType p) {
+    typedef typename std::conditional<std::is_integral<DType>::value, DType, int>::type GType;
+    std::negative_binomial_distribution<GType> dist_negbinomial(k, p);
+    return static_cast<DType>(dist_negbinomial(rnd_engine_));
   }
 
   /*!
@@ -225,6 +278,24 @@ class Random<cpu, DType> {
         [&](){ std::poisson_distribution<GType> dist_poisson(dist_gamma(rnd_engine_));
                return static_cast<DType>(dist_poisson(rnd_engine_));});
     }
+  }
+
+  template<typename PType>
+  inline DType SampleGeneralizedNegativeBinomial(PType mu, PType alpha) {
+    if (alpha == PType(0)) {
+      return SamplePoisson(mu);  // limit of Poisson
+    } else {
+      PType r(PType(1) / alpha);
+      PType beta = mu * alpha;
+      std::gamma_distribution<> dist_gamma(r, beta);
+      typedef typename std::conditional<std::is_integral<DType>::value, DType, int>::type GType;
+      std::poisson_distribution<GType> dist_poisson(dist_gamma(rnd_engine_));
+      return static_cast<DType>(dist_poisson(rnd_engine_));
+    }
+  }
+
+  std::mt19937 &GetRndEngine() {
+    return rnd_engine_;
   }
 #endif
 
@@ -263,10 +334,6 @@ class Random<cpu, DType> {
     buffer_.Resize(Shape1(shape.Size()));
     this->SampleUniform(&buffer_, 0.0f, 1.0f);
     return expr::reshape(buffer_, shape);
-  }
-
-  std::mt19937 &GetRndEngine() {
-    return rnd_engine_;
   }
 
  private:
@@ -405,6 +472,7 @@ class Random<gpu, DType> {
     curandStatus_t status;
     status = curandSetPseudoRandomGeneratorSeed(gen_, static_cast<uint64_t>(seed));
     CHECK_EQ(status, CURAND_STATUS_SUCCESS) << "Set CURAND seed failed.";
+    curand_init(seed, 0, 0, &state_);
   }
   /*!
    * \brief get a set of random integers
@@ -412,6 +480,9 @@ class Random<gpu, DType> {
   inline void GetRandInt(const Tensor<gpu, 1, unsigned>& dst) {
     curandStatus_t status = curandGenerate(gen_, dst.dptr_, dst.size(0));
     CHECK_EQ(status, CURAND_STATUS_SUCCESS) << "CURAND Gen rand ints failed.";
+  }
+  inline unsigned GetRandInt() {
+    return curand(&state_);
   }
   /*!
    * \brief generate data from uniform [a,b)
@@ -424,6 +495,8 @@ class Random<gpu, DType> {
   inline void SampleUniform(Tensor<gpu, dim, DType> *dst,
                             DType a = 0.0f, DType b = 1.0f);
 
+  inline DType SampleUniform(DType a = 0.0f, DType b = 1.0f);
+
   /*!
    * \brief generate data from standard gaussian
    * \param dst destination
@@ -434,6 +507,9 @@ class Random<gpu, DType> {
   template<int dim>
   inline void SampleGaussian(Tensor<gpu, dim, DType> *dst,
                              DType mu = 0.0f, DType sigma = 1.0f);
+
+  inline DType SampleGaussian(DType mu = 0.0f, DType sigma = 1.0f);
+
   /*!
    * \brief return a temporal expression storing standard gaussian random variables
    *        the temporal tensor is only valid before next call of gaussian or uniform
@@ -482,6 +558,12 @@ class Random<gpu, DType> {
                                             << ",mu = " << mu
                                             << ",sigma = " << sigma;
   }
+  inline float GenGaussian(float mu, float sigma) {
+    return curand_normal() * sigma + mu;
+  }
+  inline double GenGaussian(double mu, double sigma) {
+    return curand_normal_double() * sigma + mu;
+  }
   inline void GenUniform(float *dptr, size_t size) {
     curandStatus_t status;
     status = curandGenerateUniform(gen_, dptr, size);
@@ -493,6 +575,12 @@ class Random<gpu, DType> {
     status = curandGenerateUniformDouble(gen_, dptr, size);
     CHECK_EQ(status, CURAND_STATUS_SUCCESS) << "CURAND Gen Uniform double failed."
                                             << " size = " << size;
+  }
+  inline float GenUniform(float a, float b) {
+    return (b - a) * curand_uniform(&state_) + a;
+  }
+  inline double GenUniform(double a, double b) {
+    return (b - a) * curand_uniform_double(&state_) + a;
   }
   inline void CreateGenerator() {
     if (gen_ != NULL)
@@ -511,6 +599,8 @@ class Random<gpu, DType> {
   }
   /*! \brief random number generator */
   curandGenerator_t gen_;
+  /*! \brief random number state */
+  curandState_t state_;
   /*! \brief templ buffer */
   TensorContainer<gpu, 1, DType> buffer_;
 };  // class Random<gpu, DType>
