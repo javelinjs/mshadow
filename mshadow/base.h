@@ -157,6 +157,7 @@ extern "C" {
   #include <cuda.h>
   #include <cublas_v2.h>
   #include <curand.h>
+  #include <curand_kernel.h>
 #endif
 
 #if MSHADOW_USE_CUDNN == 1

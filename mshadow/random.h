@@ -559,10 +559,10 @@ class Random<gpu, DType> {
                                             << ",sigma = " << sigma;
   }
   inline float GenGaussian(float mu, float sigma) {
-    return curand_normal() * sigma + mu;
+    return curand_normal(&state_) * sigma + mu;
   }
   inline double GenGaussian(double mu, double sigma) {
-    return curand_normal_double() * sigma + mu;
+    return curand_normal_double(&state_) * sigma + mu;
   }
   inline void GenUniform(float *dptr, size_t size) {
     curandStatus_t status;
