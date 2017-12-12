@@ -499,7 +499,7 @@ class Random<gpu, DType> {
 
   template<typename PType>
   inline float SampleUniform(PType a, PType b) {
-    return SampleUniform(static_cast<float>(a), static_cast<float>(b))
+    return SampleUniform(static_cast<float>(a), static_cast<float>(b));
   }
 
   inline float SampleUniform(float a, float b) {
@@ -531,7 +531,7 @@ class Random<gpu, DType> {
 
   template<typename PType>
   inline float SampleGaussian(PType a, PType b) {
-    return SampleGaussian(static_cast<float>(a), static_cast<float>(b))
+    return SampleGaussian(static_cast<float>(a), static_cast<float>(b));
   }
 
   inline float SampleGaussian(float mu, float sigma) {
