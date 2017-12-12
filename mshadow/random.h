@@ -472,7 +472,6 @@ class Random<gpu, DType> {
     curandStatus_t status;
     status = curandSetPseudoRandomGeneratorSeed(gen_, static_cast<uint64_t>(seed));
     CHECK_EQ(status, CURAND_STATUS_SUCCESS) << "Set CURAND seed failed.";
-    curand_init(seed, 0, 0, &state_);
   }
   /*!
    * \brief get a set of random integers
@@ -482,7 +481,10 @@ class Random<gpu, DType> {
     CHECK_EQ(status, CURAND_STATUS_SUCCESS) << "CURAND Gen rand ints failed.";
   }
   inline unsigned GetRandInt() {
-    return curand(&state_);
+    unsigned dst;
+    curandStatus_t status = curandGenerate(gen_, &dst, 1);
+    CHECK_EQ(status, CURAND_STATUS_SUCCESS) << "CURAND Gen rand ints failed.";
+    return dst;
   }
   /*!
    * \brief generate data from uniform [a,b)
@@ -495,7 +497,21 @@ class Random<gpu, DType> {
   inline void SampleUniform(Tensor<gpu, dim, DType> *dst,
                             DType a = 0.0f, DType b = 1.0f);
 
-  inline DType SampleUniform(DType a = 0.0f, DType b = 1.0f);
+  inline float SampleUniform(float a, float b) {
+    float dst;
+    curandStatus_t status;
+    status = curandGenerateUniform(gen_, &dst, 1);
+    CHECK_EQ(status, CURAND_STATUS_SUCCESS) << "CURAND Gen Uniform failed.";
+    return dst;
+  }
+
+  inline double SampleUniform(double a, double b) {
+    float dst;
+    curandStatus_t status;
+    status = curandGenerateUniformDouble(gen_, &dst, 1);
+    CHECK_EQ(status, CURAND_STATUS_SUCCESS) << "CURAND Gen Uniform double failed.";
+    return dst;
+  }
 
   /*!
    * \brief generate data from standard gaussian
@@ -508,7 +524,26 @@ class Random<gpu, DType> {
   inline void SampleGaussian(Tensor<gpu, dim, DType> *dst,
                              DType mu = 0.0f, DType sigma = 1.0f);
 
-  inline DType SampleGaussian(DType mu = 0.0f, DType sigma = 1.0f);
+
+  inline float SampleGaussian(float mu, float sigma) {
+    curandStatus_t status;
+    float dst;
+    status = curandGenerateNormal(gen_, &dst, 1, mu, sigma);
+    CHECK_EQ(status, CURAND_STATUS_SUCCESS) << "CURAND Gen Normal failed."
+                                            << ",mu = " << mu
+                                            << ",sigma = " << sigma;
+    return dst;
+  }
+
+  inline double SampleGaussian(double mu, double sigma) {
+    curandStatus_t status;
+    double dst;
+    status = curandGenerateNormalDouble(gen_, &dst, 1, mu, sigma);
+    CHECK_EQ(status, CURAND_STATUS_SUCCESS) << "CURAND Gen Normal double failed."
+                                            << ",mu = " << mu
+                                            << ",sigma = " << sigma;
+    return dst;
+  }
 
   /*!
    * \brief return a temporal expression storing standard gaussian random variables
@@ -558,12 +593,6 @@ class Random<gpu, DType> {
                                             << ",mu = " << mu
                                             << ",sigma = " << sigma;
   }
-  inline float GenGaussian(float mu, float sigma) {
-    return curand_normal(&state_) * sigma + mu;
-  }
-  inline double GenGaussian(double mu, double sigma) {
-    return curand_normal_double(&state_) * sigma + mu;
-  }
   inline void GenUniform(float *dptr, size_t size) {
     curandStatus_t status;
     status = curandGenerateUniform(gen_, dptr, size);
@@ -575,12 +604,6 @@ class Random<gpu, DType> {
     status = curandGenerateUniformDouble(gen_, dptr, size);
     CHECK_EQ(status, CURAND_STATUS_SUCCESS) << "CURAND Gen Uniform double failed."
                                             << " size = " << size;
-  }
-  inline float GenUniform(float a, float b) {
-    return (b - a) * curand_uniform(&state_) + a;
-  }
-  inline double GenUniform(double a, double b) {
-    return (b - a) * curand_uniform_double(&state_) + a;
   }
   inline void CreateGenerator() {
     if (gen_ != NULL)
@@ -599,8 +622,6 @@ class Random<gpu, DType> {
   }
   /*! \brief random number generator */
   curandGenerator_t gen_;
-  /*! \brief random number state */
-  curandState_t state_;
   /*! \brief templ buffer */
   TensorContainer<gpu, 1, DType> buffer_;
 };  // class Random<gpu, DType>
