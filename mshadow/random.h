@@ -506,7 +506,7 @@ class Random<gpu, DType> {
   }
 
   inline double SampleUniform(double a, double b) {
-    float dst;
+    double dst;
     curandStatus_t status;
     status = curandGenerateUniformDouble(gen_, &dst, 1);
     CHECK_EQ(status, CURAND_STATUS_SUCCESS) << "CURAND Gen Uniform double failed.";
