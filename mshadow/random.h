@@ -497,6 +497,11 @@ class Random<gpu, DType> {
   inline void SampleUniform(Tensor<gpu, dim, DType> *dst,
                             DType a = 0.0f, DType b = 1.0f);
 
+  template<typename PType>
+  inline float SampleUniform(PType a, PType b) {
+    return SampleUniform(static_cast<float>(a), static_cast<float>(b))
+  }
+
   inline float SampleUniform(float a, float b) {
     float dst;
     curandStatus_t status;
@@ -524,6 +529,10 @@ class Random<gpu, DType> {
   inline void SampleGaussian(Tensor<gpu, dim, DType> *dst,
                              DType mu = 0.0f, DType sigma = 1.0f);
 
+  template<typename PType>
+  inline float SampleGaussian(PType a, PType b) {
+    return SampleGaussian(static_cast<float>(a), static_cast<float>(b))
+  }
 
   inline float SampleGaussian(float mu, float sigma) {
     curandStatus_t status;
